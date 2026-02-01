@@ -27,7 +27,7 @@ import os
 import logging
 import unittest
 from decimal import Decimal
-from service.models import Product, Category, db
+from service.models import Product, Category, db, DataValidationError
 from service import app
 from tests.factories import ProductFactory
 
@@ -104,3 +104,135 @@ class TestProductModel(unittest.TestCase):
     #
     # ADD YOUR TEST CASES HERE
     #
+    def test_read_a_product(self):
+        """It should be able to read a product"""
+        product = ProductFactory()
+        product.id = None
+        product.create()
+        self.assertIsNotNone(product.id)
+
+        # Check that it matches the original product
+        found_product = Product.find(product.id)
+        self.assertEqual(found_product.name, product.name)
+        self.assertEqual(found_product.description, product.description)
+        self.assertEqual(Decimal(found_product.price), product.price)
+        self.assertEqual(found_product.available, product.available)
+        self.assertEqual(found_product.category, product.category)
+
+    def test_update_a_product(self):
+        """Products should be updatable"""
+        product = ProductFactory()
+        product.id = None
+        product.create()
+        self.assertIsNotNone(product.id)
+
+        # Update product description
+        product.description = "Foo"
+        original_id = product.id
+        product.update()
+
+        products = Product.all()
+        # Updated existing product instead of making a new one
+        self.assertEqual(len(products), 1)
+        self.assertEqual(products[0].id, original_id)
+        # Product has been updated
+        self.assertEqual(products[0].description, "Foo")
+
+    def test_delete_a_product(self):
+        """Products should be deletable"""
+        product = ProductFactory()
+        product.id = None
+        product.create()
+        self.assertIsNotNone(product.id)
+
+        # Product was created
+        products = Product.all()
+        self.assertEqual(len(products), 1)
+        # Product was deleted
+        product.delete()
+        products = Product.all()
+        self.assertEqual(len(products), 0)
+
+    def test_list_all_products(self):
+        """All products should be listable"""
+        self.assertEqual(len(Product.all()), 0)
+        for _ in range(5):
+            product = ProductFactory()
+            product.id = None
+            product.create()
+            self.assertIsNotNone(product.id)
+        self.assertEqual(len(Product.all()), 5)
+
+    def test_find_product_by_name(self):
+        """Products should be searchable by name"""
+        self.assertEqual(len(Product.all()), 0)
+        # make our fake products
+        product_list = ProductFactory.create_batch(5)
+        for product in product_list:
+            product.create()
+
+        # get all products with the first name
+        name = product_list[0].name
+        count = len([product for product in product_list if product.name == name])
+        found = Product.find_by_name(name)
+        self.assertEqual(found.count(), count)
+        for product in found:
+            self.assertEqual(product.name, name)
+
+    def test_find_product_by_availability(self):
+        """Products should be searchable by availability"""
+        self.assertEqual(len(Product.all()), 0)
+        # make our fake products
+        product_list = ProductFactory.create_batch(10)
+        for product in product_list:
+            product.create()
+
+        # get all products with the first availability
+        availability = product_list[0].available
+        count = len([product for product in product_list if product.available == availability])
+        found = Product.find_by_availability(availability)
+        self.assertEqual(found.count(), count)
+        for product in found:
+            self.assertEqual(product.available, availability)
+
+    def test_find_product_by_category(self):
+        """Products should be searchable by category"""
+        self.assertEqual(len(Product.all()), 0)
+        # make our fake products
+        product_list = ProductFactory.create_batch(10)
+        for product in product_list:
+            product.create()
+
+        # get all products with the first category in product list
+        category = product_list[0].category
+        count = len([product for product in product_list if product.category == category])
+        found = Product.find_by_category(category)
+        self.assertEqual(found.count(), count)
+        for product in found:
+            self.assertEqual(product.category, category)
+
+    def test_find_product_by_price(self):
+        """Products should be searchable by price"""
+        self.assertEqual(len(Product.all()), 0)
+        # make our fake products
+        product_list = ProductFactory.create_batch(10)
+        for product in product_list:
+            product.create()
+
+        # get all products with the first price in product list
+        price = product_list[0].price
+        count = len([product for product in product_list if product.price == price])
+        found = Product.find_by_price(price)
+        self.assertEqual(found.count(), count)
+        for product in found:
+            self.assertEqual(product.price, price)
+
+    def test_update_without_an_id(self):
+        """It should raise an error if updated without an id"""
+        product = ProductFactory()
+        product.create()
+
+        # Update on an invalid product should cause exception
+        product.id = None
+        product.description = "Foo"
+        self.assertRaises(DataValidationError, product.update)
